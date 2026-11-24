@@ -1,0 +1,132 @@
+/* =========================================================================
+ * 全局组件样式（跨页面复用的小件）
+ * 组件内部私有样式一律 scoped；这里只放真正共享的东西。
+ * ========================================================================= */
+
+/* ---- 顶部栏 ---- */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: none;
+  height: var(--header-h);
+  padding: 0 var(--space-5);
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  z-index: var(--z-chrome);
+}
+
+/* ---- 房间码徽标 ---- */
+.room-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fcfcfa;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--ink);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.room-code:hover {
+  border-color: #d0cdc2;
+  background: #fff;
+}
+
+.room-code__icon {
+  color: var(--ink-soft);
+  opacity: 0.6;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.room-code:hover .room-code__icon {
+  opacity: 1;
+}
+
+/* ---- 状态胶囊 ---- */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  line-height: 1;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--surface-sunk);
+  color: var(--ink-soft);
+}
+
+.status-pill__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.status-pill--ok {
+  background: var(--ok-weak);
+  color: #0b7a58;
+}
+
+.status-pill--ok .status-pill__dot {
+  box-shadow: 0 0 0 3px rgba(18, 184, 134, 0.14);
+}
+
+.status-pill--warn {
+  background: var(--warn-weak);
+  color: #b4440b;
+}
+
+.status-pill--sync .status-pill__dot {
+  animation: co-pulse 1.4s var(--ease) infinite;
+}
+
+@keyframes co-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.28;
+  }
+}
+
+/* ---- 通用浮层 ---- */
+.surface {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+}
+
+/* ---- 分隔竖线 ---- */
+.divider-v {
+  width: 1px;
+  height: 20px;
+  background: var(--line);
+  flex: none;
+}
+
+@media (max-width: 767px) {
+  .app-header {
+    height: var(--header-h-mobile);
+    padding: 0 var(--space-3);
+    padding-top: var(--safe-top);
+    box-sizing: content-box;
+    gap: var(--space-2);
+  }
+}

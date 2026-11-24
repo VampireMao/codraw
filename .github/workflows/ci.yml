@@ -1,0 +1,237 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (vet + test -race)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+          cache-dependency-path: backend/go.sum
+
+      - name: gofmt check
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "以下文件未格式化："
+            echo "$out"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test -race
+        run: go test -race -count=1 ./...
+
+      - name: build (linux/amd64, static)
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build -trimpath -ldflags "-s -w" -o /tmp/codraw ./cmd/server
+          file /tmp/codraw
+          # 必须是静态链接：产物要在 distroless / scratch 里跑
+          file /tmp/codraw | grep -q 'statically linked'
+
+  frontend:
+    name: Frontend (typecheck + test + build)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Unit test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Assert bundle is small
+        run: |
+          kb=$(du -sk dist | cut -f1)
+          echo "dist: ${kb}KB"
+          if [ "$kb" -gt 800 ]; then
+            echo "::error::前端产物 ${kb}KB 超过 800KB 预算"
+            exit 1
+          fi
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          retention-days: 3
+
+  single-binary:
+    name: Single binary embeds frontend
+    runs-on: ubuntu-24.04
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+          cache-dependency-path: backend/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      # 用仓库里的唯一构建入口：它会校验 embed 目录与 web/dist 一致，
+      # 防止"二进制里嵌的是旧前端"这类静默失败（我们踩过）。
+      - name: Build both platforms
+        run: bash scripts/build-all.sh
+        env:
+          GOFLAGS: -mod=mod
+
+      - name: Verify artifacts
+        run: |
+          ls -lh dist/
+          # 必须是静态链接的单文件
+          file dist/codraw-linux-amd64 | grep -q 'statically linked'
+          # 前端必须真的嵌进去了
+          grep -qa 'manifest.webmanifest' dist/codraw-linux-amd64
+          echo "OK: 静态链接 + 前端已嵌入"
+
+      - name: Smoke test the binary in an empty directory
+        run: |
+          set -e
+          mkdir -p /tmp/sandbox && cp dist/codraw-linux-amd64 /tmp/sandbox/codraw
+          cd /tmp/sandbox
+          PORT=18080 APP_ENV=development ALLOW_EMPTY_ORIGIN=true \
+            STORE=memory BROKER=memory \
+            PUBLIC_BASE_URL=http://127.0.0.1:18080 \
+            READONLY_SECRET=ci-secret-at-least-32-bytes-long-ok \
+            ./codraw &
+          SRV=$!
+          ok=0
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:18080/healthz >/dev/null 2>&1; then ok=1; break; fi
+            sleep 0.25
+          done
+          echo "--- healthz ---"
+          curl -s http://127.0.0.1:18080/healthz || true
+          echo
+          echo "--- 首页 ---"
+          curl -s -o /dev/null -w 'HTTP %{http_code}\n' http://127.0.0.1:18080/
+          echo "--- SPA 深链 ---"
+          curl -s -o /dev/null -w 'HTTP %{http_code}\n' http://127.0.0.1:18080/r/ABC123
+          kill $SRV 2>/dev/null || true
+          test "$ok" = "1"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codraw-binaries
+          path: |
+            dist/codraw-linux-amd64
+            dist/codraw-windows-amd64.exe
+          retention-days: 7
+
+  docs:
+    name: Required docs present
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check
+        run: |
+          set -e
+          for f in \
+            docs/PRD.md \
+            docs/ARCHITECTURE.md \
+            docs/PROTOCOL.md \
+            docs/PERMISSIONS.md \
+            docs/DATA-MODEL.md \
+            docs/DEPLOY-SYSTEMD.md \
+            docs/sql/0001_init.sql \
+            README.md ; do
+            test -f "$f" || { echo "::error::缺少 $f"; exit 1; }
+          done
+          echo "文档齐全"
+
+  ddl:
+    name: DDL idempotent (real Postgres)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ddl
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply docs/sql twice (must be idempotent)
+        env:
+          PGPASSWORD: ci
+        run: |
+          set -e
+          for round in 1 2; do
+            echo "--- round $round ---"
+            psql -h localhost -U postgres -d ddl -v ON_ERROR_STOP=1 \
+              -f docs/sql/0001_init.sql
+          done
+
+      - name: Assert schema objects exist
+        env:
+          PGPASSWORD: ci
+        run: |
+          set -e
+          psql -h localhost -U postgres -d ddl -t -c "
+            SELECT count(*) FROM information_schema.tables
+            WHERE table_name IN ('rooms','events','snapshots','room_grants','schema_migrations');
+          " | tr -d ' ' | grep -qx '4' \
+            || { echo "::error::缺少预期的表"; exit 1; }
+          psql -h localhost -U postgres -d ddl -t -c "
+            SELECT count(*) FROM information_schema.columns
+            WHERE table_name='rooms' AND column_name='owner_client_id';
+          " | tr -d ' ' | grep -qx '1' \
+            || { echo "::error::rooms.owner_client_id 缺失"; exit 1; }
+          echo "schema OK"

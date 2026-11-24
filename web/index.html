@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+    <meta name="theme-color" content="#3D5AFE" />
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="同绘 CoDraw：打开链接就能一起画画的在线白板。多人实时协作、断网续画、免注册。" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="同绘" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <title>同绘 CoDraw · 打开链接，一起把想法画出来</title>
+    <style>
+      /* 首屏骨架：避免 JS 加载前的白闪（与 --paper 一致） */
+      html,
+      body {
+        margin: 0;
+        background: #f7f6f2;
+      }
+      #app:empty::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: #f7f6f2;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>
+      <div style="padding: 48px 24px; font-family: system-ui, sans-serif; text-align: center; color: #16181d">
+        <p style="font-size: 16px">同绘 CoDraw 需要 JavaScript 才能绘制白板。</p>
+        <p style="font-size: 14px; color: #5b6070">请在浏览器设置中启用 JavaScript 后刷新页面。</p>
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

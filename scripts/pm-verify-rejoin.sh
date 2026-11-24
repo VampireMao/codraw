@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -uo pipefail
+export PATH="$HOME/.gvm/gos/go1.27.3/bin:$PATH"
+export GOCACHE=/tmp/gocache-pm
+ROOT=/mnt/d/Work/AI-TMP/codraw
+cd "$ROOT" || exit 1
+
+export NVM_DIR="$HOME/.nvm"
+# shellcheck disable=SC1091
+. "$NVM_DIR/nvm.sh" >/dev/null 2>&1
+nvm use 24.18.0 >/dev/null 2>&1
+
+echo "=== 构建（含前端最新代码）==="
+cd "$ROOT/web"
+npm run build 2>&1 | grep -E 'built in|error'
+cd "$ROOT"
+bash backend/scripts/sync-webui.sh >/dev/null
+cd backend
+CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w" -o /tmp/codraw-rejoin ./cmd/server || exit 1
+echo "build OK"
+
+PORT=18250
+PIDS=$(ss -ltnp 2>/dev/null | grep ":$PORT " | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u)
+for p in $PIDS; do kill -9 "$p" 2>/dev/null || true; done
+sleep 1
+
+cd /tmp
+PORT=$PORT APP_ENV=development ALLOW_EMPTY_ORIGIN=true \
+STORE=memory BROKER=memory PUBLIC_BASE_URL="http://127.0.0.1:$PORT" \
+READONLY_SECRET="rejoin-secret-at-least-32-bytes-ok" \
+LEAVE_GRACE=2s \
+/tmp/codraw-rejoin > /tmp/rejoin.log 2>&1 &
+SRV=$!
+
+READY=0
+for i in $(seq 1 80); do
+  if curl -sf "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1; then READY=1; break; fi
+  sleep 0.25
+done
+[ "$READY" = "1" ] || { echo "服务未就绪"; tail -8 /tmp/rejoin.log; kill $SRV 2>/dev/null; exit 1; }
+echo "服务就绪"
+
+cd "$ROOT/web"
+node "$ROOT/scripts/e2e-rejoin-history.mjs" "http://127.0.0.1:$PORT" 4000
+RC=$?
+kill $SRV 2>/dev/null
+exit $RC

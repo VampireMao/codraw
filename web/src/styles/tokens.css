@@ -1,0 +1,103 @@
+/* =========================================================================
+ * 同绘 CoDraw · Design Tokens
+ * 唯一来源：docs/UX-SPEC.md §4。组件只允许消费此处变量，不写魔法值。
+ * ========================================================================= */
+
+:root {
+  /* ---- 色板（UX-SPEC §4 原值，勿改） ---------------------------------- */
+  --paper: #f7f6f2;
+  --ink: #16181d;
+  --ink-soft: #5b6070;
+  --line: #e4e2da;
+  --brand: #3d5afe;
+  --brand-weak: #edf0ff;
+  --ok: #12b886;
+  --warn: #e8590c;
+  --panel: #ffffff;
+  --shadow: 0 2px 8px rgba(20, 22, 28, 0.08), 0 12px 32px rgba(20, 22, 28, 0.06);
+
+  /* ---- 派生色（只做状态与层次，不引入新色相） ------------------------- */
+  --brand-deep: #2c46e8;
+  --brand-press: #2439c9;
+  --ink-hover: #23262e;
+  --ok-weak: #e7f8f2;
+  --warn-weak: #fdefe6;
+  --surface-sunk: #f1efe9;
+  --note: #fcf3d9;
+  --note-line: #eee1bc;
+  --overlay: rgba(22, 24, 29, 0.32);
+
+  --shadow-sm: 0 1px 2px rgba(20, 22, 28, 0.06);
+  --shadow-md: 0 4px 16px rgba(20, 22, 28, 0.1);
+  --shadow-up: 0 -2px 8px rgba(20, 22, 28, 0.05), 0 -12px 32px rgba(20, 22, 28, 0.05);
+
+  /* ---- 字体（UX-SPEC §4） -------------------------------------------- */
+  --font-sans: ui-sans-serif, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Mono', 'Menlo', monospace;
+
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 32px;
+  --text-display: 56px;
+
+  --leading: 1.6;
+  --leading-tight: 1.2;
+
+  /* ---- 形状与节奏 ----------------------------------------------------- */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* 可点区域下限（UX-SPEC §PRD 交互底线） */
+  --tap: 44px;
+
+  /* ---- 布局 ----------------------------------------------------------- */
+  --header-h: 56px;
+  --header-h-mobile: 48px;
+  --rail-w: 56px;
+  --mobile-bar-h: 60px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+
+  /* ---- 动效 ----------------------------------------------------------- */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-slow: 320ms;
+
+  /* ---- 层级 ----------------------------------------------------------- */
+  --z-canvas: 1;
+  --z-chrome: 20;
+  --z-drawer: 60;
+  --z-modal: 100;
+  --z-toast: 200;
+
+  /* 协作光标调色板（UX-SPEC §4，服务端按加入顺序分配，前端只消费） */
+  --c1: #3d5afe;
+  --c2: #e8590c;
+  --c3: #12b886;
+  --c4: #7048e8;
+  --c5: #e64980;
+  --c6: #0ca678;
+  --c7: #f59f00;
+  --c8: #1c7ed6;
+}

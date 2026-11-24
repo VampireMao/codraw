@@ -1,0 +1,30 @@
+# 依赖与构建产物
+node_modules/
+web/dist/
+backend/internal/webui/dist/*
+!backend/internal/webui/dist/.gitkeep
+backend/bin/
+# 双平台单文件产物（scripts/build-binaries.sh 输出）
+/dist/
+*.exe
+*.test
+*.out
+coverage*
+.vite/
+
+# 环境与密钥
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+tmp/
+.tmp/
