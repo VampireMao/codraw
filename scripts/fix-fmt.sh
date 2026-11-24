@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/.." && pwd)"
+. "$_SCRIPT_DIR/_env.sh"
 set -uo pipefail
-export PATH="$HOME/.gvm/gos/go1.27.3/bin:$PATH"
-cd /mnt/d/Work/AI-TMP/codraw/backend || exit 1
+cd "$_REPO_ROOT/backend" || exit 1
 
 echo "=== 格式化 ==="
 gofmt -w internal/room/roles.go
@@ -14,5 +16,4 @@ if [ -z "$OUT" ]; then echo "OK: 全部已格式化"; else echo "仍有:"; echo 
 
 echo
 echo "=== 确认格式化没破坏编译 ==="
-export GOCACHE=/tmp/gocache-pm
 go build -o /tmp/codraw-fmt ./cmd/server && echo "build OK"

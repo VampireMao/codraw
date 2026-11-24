@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Two-instance integration check with assertions. Exits non-zero on any mismatch,
 # so it can run in CI and be quoted in the report.
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/../.." && pwd)"
+. "$_REPO_ROOT/scripts/_env.sh"
 set -euo pipefail
-export PATH="$HOME/.gvm/gos/go1.27.3/bin:$PATH"
-export GOCACHE="${GOCACHE:-/tmp/codraw-gocache}"
-cd /mnt/d/Work/AI-TMP/codraw/backend
+cd "$_REPO_ROOT/backend"
 
 PGPORT=${PGPORT:-55436}; RPORT=${RPORT:-56383}
 PGNAME=codraw-pg-ci; RNAME=codraw-redis-ci

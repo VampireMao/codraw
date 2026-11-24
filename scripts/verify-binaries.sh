@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # 双平台产物运行验证：Linux 直接跑，Windows 产物用 wine（若无则只做结构检查）
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/.." && pwd)"
 set -uo pipefail
-ROOT=/mnt/d/Work/AI-TMP/codraw
+ROOT="$_REPO_ROOT"
 DIST="$ROOT/dist"
 cd "$ROOT" || exit 1
 

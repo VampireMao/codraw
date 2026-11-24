@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Proves joined.payload.instanceId and /ops/data.instanceId are present and equal,
 # and that two instances report different IDs.
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/../.." && pwd)"
+. "$_REPO_ROOT/scripts/_env.sh"
 set -euo pipefail
-export PATH="$HOME/.gvm/gos/go1.27.3/bin:$PATH"
-export GOCACHE="${GOCACHE:-/tmp/codraw-gocache}"
-cd /mnt/d/Work/AI-TMP/codraw/backend
+cd "$_REPO_ROOT/backend"
 
 GOBIN=/tmp/codraw-instid
 rm -rf "$GOBIN"; mkdir -p "$GOBIN"

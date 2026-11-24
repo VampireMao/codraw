@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Contract-alignment self-check, mirroring docs/CONTRACT-ALIGNMENT.md §5.
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/../.." && pwd)"
 set -uo pipefail
-cd /mnt/d/Work/AI-TMP/codraw
+cd "$_REPO_ROOT"
 FAIL=0
 ok() { echo "  [OK]   $1"; }
 bad() { echo "  [FAIL] $1"; FAIL=1; }

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/.." && pwd)"
+. "$_REPO_ROOT/scripts/_env.sh"
 #
 # End-to-end acceptance in memory mode: real binary, real HTTP, real WebSocket.
 #
@@ -21,7 +24,6 @@ cd "$BACKEND"
 if ! command -v go >/dev/null 2>&1; then
   export PATH="$HOME/.gvm/gos/go1.27.3/bin:$PATH"
 fi
-export GOCACHE="${GOCACHE:-/tmp/codraw-gocache}"
 
 BIN=/tmp/codraw-e2e
 rm -rf "$BIN"; mkdir -p "$BIN"

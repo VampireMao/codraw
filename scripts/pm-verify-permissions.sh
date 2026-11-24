@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # PM 独立验收：权限模型 P1–P12
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/.." && pwd)"
+. "$_SCRIPT_DIR/_env.sh"
 set -uo pipefail
-export PATH="$HOME/.gvm/gos/go1.27.3/bin:$PATH"
-export GOCACHE=/tmp/gocache-pm
-ROOT=/mnt/d/Work/AI-TMP/codraw
+ROOT="$_REPO_ROOT"
 cd "$ROOT" || exit 1
 
 echo "=== 编译后端 ==="
@@ -41,10 +42,6 @@ echo "服务就绪"
 echo
 echo "=== 跑权限验收 ==="
 cd "$ROOT"
-export NVM_DIR="$HOME/.nvm"
-# shellcheck disable=SC1091
-. "$NVM_DIR/nvm.sh" >/dev/null 2>&1
-nvm use 24.18.0 >/dev/null 2>&1
 node scripts/e2e-permissions.mjs --base "http://127.0.0.1:$PORT"
 RC=$?
 

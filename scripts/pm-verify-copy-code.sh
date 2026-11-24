@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/.." && pwd)"
+. "$_SCRIPT_DIR/_env.sh"
 set -uo pipefail
-ROOT=/mnt/d/Work/AI-TMP/codraw
-export NVM_DIR="$HOME/.nvm"
-# shellcheck disable=SC1091
-. "$NVM_DIR/nvm.sh" >/dev/null 2>&1
-nvm use 24.18.0 >/dev/null 2>&1
+ROOT="$_REPO_ROOT"
 
 echo "=== typecheck ==="
 cd "$ROOT/web"

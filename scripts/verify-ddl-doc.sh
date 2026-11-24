@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # 验证 docs/sql/0001_init.sql 在真实 Postgres 上可执行且幂等
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/.." && pwd)"
 set -uo pipefail
-ROOT=/mnt/d/Work/AI-TMP/codraw
+ROOT="$_REPO_ROOT"
 SQL="$ROOT/docs/sql/0001_init.sql"
 CT=codraw-ddl-check
 

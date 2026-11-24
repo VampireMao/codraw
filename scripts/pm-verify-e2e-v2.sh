@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 # 旧协议 E2E（已按 v2 权限模型更新断言）
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/.." && pwd)"
+. "$_SCRIPT_DIR/_env.sh"
 set -uo pipefail
-export PATH="$HOME/.gvm/gos/go1.27.3/bin:$PATH"
-export GOCACHE=/tmp/gocache-pm
-ROOT=/mnt/d/Work/AI-TMP/codraw
+ROOT="$_REPO_ROOT"
 cd "$ROOT" || exit 1
 
-export NVM_DIR="$HOME/.nvm"
-# shellcheck disable=SC1091
-. "$NVM_DIR/nvm.sh" >/dev/null 2>&1
-nvm use 24.18.0 >/dev/null 2>&1
 
 cd "$ROOT/backend"
 go build -o /tmp/codraw-e2e ./cmd/server || exit 1

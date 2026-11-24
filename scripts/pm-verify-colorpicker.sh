@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/.." && pwd)"
+. "$_SCRIPT_DIR/_env.sh"
 set -uo pipefail
-export PATH="$HOME/.gvm/gos/go1.27.3/bin:$PATH"
-export GOCACHE=/tmp/gocache-pm
-ROOT=/mnt/d/Work/AI-TMP/codraw
+ROOT="$_REPO_ROOT"
 cd "$ROOT" || exit 1
 
-export NVM_DIR="$HOME/.nvm"
-# shellcheck disable=SC1091
-. "$NVM_DIR/nvm.sh" >/dev/null 2>&1
-nvm use 24.18.0 >/dev/null 2>&1
 
 echo "=== typecheck ==="
 cd "$ROOT/web"
