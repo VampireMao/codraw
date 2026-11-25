@@ -2,6 +2,10 @@
 
 > 打开链接就能**多人同时画**的在线白板：PC 与手机同一套体验，断网续画，扫码入会，只读分享。
 
+### 🚀 在线演示：**[codraw.wakepc.cn](https://codraw.wakepc.cn)**
+
+打开即用，无需注册。建议用**两台设备**（电脑 + 手机）同时进入同一房间，体验实时协作与权限授权。
+
 [![CI](https://github.com/VampireMao/codraw/actions/workflows/ci.yml/badge.svg)](https://github.com/VampireMao/codraw/actions/workflows/ci.yml)
 
 | 指标 | 实测（同机压测，i5-12600K / 15GB / WSL2） |
@@ -48,6 +52,10 @@ flowchart LR
 ---
 
 ## 快速开始
+
+### 方式零：直接用在线演示（最快）
+
+打开 **<https://codraw.wakepc.cn>**，点「新建白板」即可。无需安装、无需注册。
 
 ### 方式一：直接用发布产物（零依赖）
 
