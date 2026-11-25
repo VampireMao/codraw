@@ -418,6 +418,12 @@ export class RealtimeClient {
       this.options.listeners.onToast('对方已经离开房间', 'warn')
       return
     }
+    if (code === 'target_readonly') {
+      // A readonly-token connection is permanently viewer; granting/transferring
+      // to it would otherwise look like a silent no-op.
+      this.options.listeners.onToast('对方当前是只读链接，无法提升为可编辑或接收房主', 'warn')
+      return
+    }
     if (code === 'invalid_grant') {
       this.options.listeners.onToast('授权参数无效，转移房主请用「转移房主」', 'warn')
       return

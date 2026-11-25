@@ -242,9 +242,11 @@ CREATE TABLE IF NOT EXISTS room_grants (
 | 非 owner 发 `room.grant` | `error{forbidden}` + **断开**（4003）|
 | 非 owner 发 `room.transfer` | `error{forbidden}` + **断开**（4003）|
 | 授权目标不在线 | `error{target_offline}`，不断连接 |
+| 授权目标是只读链接连接 | `error{target_readonly}`，不断连接；对方永远不会被提升 |
 | 授权 `role: "owner"` | `error{invalid_grant}`，提示用 transfer |
 | 授权自己 | `error{invalid_grant}` |
 | 转移给不在线的人 | `error{target_offline}` |
+| 转移给只读链接连接 | `error{target_readonly}`；否则会出现“owner 不能管理”的死锁 |
 | viewer 发 `op.add` | `ack{rejected, forbidden}`，**不断连接**（现状保持）|
 | 被撤销后继续发 `op.add` | 同上 |
 

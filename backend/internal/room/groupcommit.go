@@ -187,8 +187,8 @@ func (r *room) stageOp(user protocol.User, p *protocol.OpAddPayload) (*pendingOp
 
 	switch p.Action {
 	case protocol.ActionCreate:
-		existing, exists := r.shapes[shape.ID]
-		if exists && !existing.Deleted {
+		existing, exists, deleted := r.effectiveShape(shape.ID)
+		if exists && !deleted {
 			return nil, protocol.NewError(protocol.CodeDuplicateShape, "shape %s already exists", shape.ID)
 		}
 		shape.Author = protocol.Author{CID: user.ClientID, Name: user.Name}
@@ -206,11 +206,11 @@ func (r *room) stageOp(user protocol.User, p *protocol.OpAddPayload) (*pendingOp
 		op.broadcast.Rev = shape.Rev
 
 	case protocol.ActionUpdate:
-		existing, ok := r.shapes[shape.ID]
-		if !ok {
+		existing, exists, deleted := r.effectiveShape(shape.ID)
+		if !exists {
 			return nil, protocol.NewError(protocol.CodeShapeNotFound, "shape %s not found", shape.ID)
 		}
-		if existing.Deleted {
+		if deleted {
 			return nil, protocol.NewError(protocol.CodeShapeDeleted, "shape %s is deleted", shape.ID)
 		}
 		shape.Author = existing.Author
@@ -224,14 +224,14 @@ func (r *room) stageOp(user protocol.User, p *protocol.OpAddPayload) (*pendingOp
 		op.broadcast.Rev = shape.Rev
 
 	case protocol.ActionDelete:
-		existing, ok := r.shapes[p.ID]
-		if !ok {
+		existing, exists, deleted := r.effectiveShape(p.ID)
+		if !exists {
 			return nil, protocol.NewError(protocol.CodeShapeNotFound, "shape %s not found", p.ID)
 		}
-		if existing.Deleted {
+		if deleted {
 			return nil, protocol.NewError(protocol.CodeShapeDeleted, "shape %s already deleted", p.ID)
 		}
-		del := *existing
+		del := existing
 		del.Deleted = true
 		del.Rev = existing.Rev + 1
 		del.UpdatedAt = ts
@@ -241,17 +241,17 @@ func (r *room) stageOp(user protocol.User, p *protocol.OpAddPayload) (*pendingOp
 		op.broadcast.Rev = del.Rev
 
 	case protocol.ActionAppend:
-		existing, ok := r.shapes[p.ID]
-		if !ok {
+		existing, exists, deleted := r.effectiveShape(p.ID)
+		if !exists {
 			return nil, protocol.NewError(protocol.CodeShapeNotFound, "shape %s not found", p.ID)
 		}
-		if existing.Deleted {
+		if deleted {
 			return nil, protocol.NewError(protocol.CodeShapeDeleted, "shape %s is deleted", p.ID)
 		}
 		if existing.Kind != protocol.KindFreehand && existing.Kind != protocol.KindArrow {
 			return nil, protocol.NewError(protocol.CodeInvalidOp, "append is only valid for freehand and arrow")
 		}
-		appended, err := appendPoints(existing, p.Points)
+		appended, err := appendPoints(&existing, p.Points)
 		if err != nil {
 			return nil, err
 		}
@@ -274,6 +274,37 @@ func (r *room) stageOp(user protocol.User, p *protocol.OpAddPayload) (*pendingOp
 	}
 	op.broadcast.payload = payload
 	return op, nil
+}
+
+// effectiveShape resolves how a shape will look after the ops already staged in
+// this batch. stageOp runs before the current op is appended to r.pending, so the
+// overlay contains only earlier ops — exactly the state this op should see.
+//
+// Without this overlay, create+delete (or create+update/append) inside one 20ms
+// batch saw the committed map only: the delete/update was rejected as
+// shape_not_found even though the create was valid and already staged. That was
+// how an empty note could be created locally, rejected for deletion, and then
+// reappear as a ghost shape after a reload.
+func (r *room) effectiveShape(id string) (shape protocol.Shape, exists, deleted bool) {
+	if committed, ok := r.shapes[id]; ok {
+		shape = *committed
+		exists = true
+		deleted = committed.Deleted
+	}
+	for _, p := range r.pending {
+		if p.member == nil || p.shapeID != id {
+			// Duplicate placeholders (member == nil) carry no shape; other ids are
+			// irrelevant to this lookup.
+			continue
+		}
+		switch p.action {
+		case protocol.ActionCreate, protocol.ActionUpdate, protocol.ActionDelete, protocol.ActionAppend:
+			shape = p.shape
+			exists = true
+			deleted = p.shape.Deleted
+		}
+	}
+	return shape, exists, deleted
 }
 
 // flushPending allocates seqs, writes the batch, then commits and broadcasts it.

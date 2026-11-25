@@ -347,6 +347,13 @@ func (r *room) handleGrant(cmd command) {
 		r.sendPermissionError(m, protocol.CodeInvalidGrant, "the owner's role is not grantable", false)
 		return
 	}
+	if cmd.grant.Role == protocol.RoleEditor && !r.hasWritableMember(target) {
+		// A readonly connection is pinned to viewer forever (PERMISSIONS §4.2
+		// rule 1). Granting editor to it would show a success in the owner's UI
+		// while the target stays unable to draw.
+		r.sendPermissionError(m, protocol.CodeTargetReadonly, "target has only a read-only connection", false)
+		return
+	}
 	r.setGrantLocked(target, cmd.grant.Role, ms.user.ClientID)
 	r.emitRoleChange(protocol.MemberRolePayload{
 		ClientID:  target,
@@ -376,6 +383,13 @@ func (r *room) handleTransfer(cmd command) {
 	}
 	if !r.cidHasLiveMember(target) {
 		r.sendPermissionError(m, protocol.CodeTargetOffline, "target is not online", false)
+		return
+	}
+	if !r.hasWritableMember(target) {
+		// Transferring to a readonly-only member would make ownerClientID point
+		// at a connection that is permanently capped to viewer: nobody could
+		// grant or transfer until that member leaves.
+		r.sendPermissionError(m, protocol.CodeTargetReadonly, "target has only a read-only connection", false)
 		return
 	}
 	prev := r.ownerClientID

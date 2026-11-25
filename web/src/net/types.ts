@@ -345,6 +345,7 @@ export const ERROR_TEXT: Readonly<Record<string, string>> = {
   unauthenticated: '身份信息失效，请重新进入房间',
   forbidden: '没有权限：只读成员无法编辑，房主可授予权限',
   target_offline: '对方已经离开房间',
+  target_readonly: '对方当前是只读链接，无法提升为可编辑或接收房主',
   invalid_grant: '授权参数无效（房主转移请用「转移房主」）',
   invalid_op: '操作无效，已撤销',
   rate_limited: '操作太快了，稍等一秒',

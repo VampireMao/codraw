@@ -26,7 +26,11 @@ export class NoteTool implements Tool {
     host.addShape(shape)
     host.setSelection([shape.id])
     host.endGesture()
-    host.openNoteEditor(shape)
+    // 不能在 pointerdown 里同步打开编辑器：同一次点击的 mousedown/默认焦点
+    // 行为会在 nextTick 的 focus() 之后把焦点移回 canvas，textarea 立刻 blur，
+    // commitNote 把一个空便签删掉（并可能与同批次的 create 撞车）。
+    // 放到当前点击序列结束后的宏任务里，焦点才是稳定的。
+    setTimeout(() => host.openNoteEditor(shape), 0)
     if (!this.transient) host.afterShapeCommitted('note')
   }
 

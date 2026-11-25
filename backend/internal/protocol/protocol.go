@@ -113,8 +113,9 @@ const (
 	CodeNotImplemented   ErrCode = "not_implemented"
 	CodeTooManyRequests  ErrCode = "too_many_requests"
 	// Permission-model codes (docs/PERMISSIONS.md §8).
-	CodeTargetOffline ErrCode = "target_offline"
-	CodeInvalidGrant  ErrCode = "invalid_grant"
+	CodeTargetOffline  ErrCode = "target_offline"
+	CodeTargetReadonly ErrCode = "target_readonly"
+	CodeInvalidGrant   ErrCode = "invalid_grant"
 )
 
 // FatalCodes are the codes that must terminate the connection.

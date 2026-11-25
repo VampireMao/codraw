@@ -472,6 +472,7 @@ WS 升级成功
 - 仅当前 `owner` 可发；其他人 → `error{code:"forbidden", fatal:true}` + close **4003**。
 - `role:"owner"` 或 `targetClientId === 自己` → `error{code:"invalid_grant"}`，连接不断。
 - 目标不在线 → `error{code:"target_offline"}`，连接不断。
+- 目标只有只读 token 连接 → `error{code:"target_readonly"}`，连接不断（只读连接永远不能编辑）。
 - 成功后广播 `member.role`（见 §4.11），并**占用 seq**。
 - 完整状态机与验收见 `docs/PERMISSIONS.md` §3、§8。
 
@@ -490,6 +491,7 @@ WS 升级成功
 
 - 仅当前 `owner`；非 owner → `forbidden` + close 4003。
 - 目标必须在线，否则 `error{code:"target_offline"}`，连接不断。
+- 目标只有只读 token 连接 → `error{code:"target_readonly"}`，连接不断；否则会出现无人可管理的死锁。
 - 成功后：目标升为 `owner`，原房主降为 `editor`，广播两条 `member.role`（各占一个 seq）。
 
 ---
@@ -1025,6 +1027,7 @@ sequenceDiagram
 | `snapshot_too_large` | 图形 > 5000，不走 WS 快照 | false | 改用 REST `/snapshot` 分页 |
 | `internal` | panic/存储失败 | false | 可重试一次，之后提示 |
 | `target_offline` | 授权/转移目标不在线 | false | 刷新成员列表后重试 |
+| `target_readonly` | 授权/转移目标只有只读链接连接 | false | 让对方用普通链接/编辑链接重新进入 |
 | `invalid_grant` | 授权 `role:"owner"`、授权自己、非法角色 | false | 转移请用 `room.transfer` |
 
 **Close code**：`1000` 正常｜`1001` 服务端停机/心跳超时｜`1008` 策略违规（Origin/鉴权）｜`1009` 消息过大｜`1011` 内部错误｜`4000` 心跳超时｜`4001` 慢消费者被踢｜`4002` 连接数超限｜**`4003` 越权（非 owner 发 `room.grant`/`room.transfer`）**。

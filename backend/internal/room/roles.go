@@ -69,6 +69,19 @@ func (r *room) cidHasLiveMember(cid string) bool {
 	return false
 }
 
+// hasWritableMember reports whether the client id has at least one connection
+// that is not pinned to viewer by a readonly token. Grant/transfer must use this,
+// not cidHasLiveMember: a readonly connection is a real member but can never act
+// as editor or owner (PERMISSIONS §4.2 rule 1).
+func (r *room) hasWritableMember(cid string) bool {
+	for _, ms := range r.members {
+		if ms.user.ClientID == cid && !ms.readonly {
+			return true
+		}
+	}
+	return false
+}
+
 // roleForJoin implements the handshake order from docs/PERMISSIONS.md §4.2 and
 // §4.4 literally:
 //
