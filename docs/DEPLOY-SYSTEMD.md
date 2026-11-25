@@ -333,6 +333,25 @@ client_max_body_size 1m;
 
 单条 WS 消息上限 64KB，1m 足够。
 
+### 4.5 access_log 会记录 `?st=` / `?k=` / `?rt=`
+
+默认 `combined` 格式会记录完整 query string，而其中包含**会话 token、编辑 key、只读 token**。应用自身的访问日志已脱敏，但 nginx 不会。三选一：
+
+```nginx
+# A. 只记录路径，不记录 query（推荐，简单）
+log_format codraw '$remote_addr - $remote_user [$time_local] "$request_method $uri $server_protocol" '
+                  '$status $body_bytes_sent "$http_referer" "$http_user_agent"';
+access_log /var/log/nginx/access.log codraw;
+
+# B. 对房间页关闭访问日志
+location ~ ^/r/ { access_log off; proxy_pass http://127.0.0.1:8080; ... }
+
+# C. 只把 nginx 日志写到受限文件，并依赖应用日志排查
+```
+
+> 会话 token 的有效期默认 30 天（`ROOM_TTL`），泄露等价于身份被冒用；这一步不是可选项。
+
+
 ### 完整参考配置
 
 ```nginx

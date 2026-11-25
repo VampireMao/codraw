@@ -38,6 +38,8 @@ export interface WsClientOptions {
   key?: string
   /** 只读 token（`?rt=`）；存在时服务端强制 viewer */
   rt?: string
+  /** 服务端签发的会话 token（`?st=`）；重连时必须原样带回 */
+  sessionToken?: string
   /** WS URL 构造函数（测试注入用） */
   urlFactory?: (params: HandshakeParams) => string
   /** WebSocket 构造器（测试注入假实现） */
@@ -100,6 +102,20 @@ export class WsClient {
     return this.joined
   }
 
+  /**
+   * 采用服务端下发的会话身份。
+   *
+   * 服务端可能拒绝客户端自报的 cid（没有有效 token 时），并返回新的
+   * `you.clientId` 与 `sessionToken`。此后的握手与信封都必须使用这一对值。
+   */
+  setSession(token: string, clientId: string): void {
+    if (token) this.options.sessionToken = token
+    if (clientId && clientId !== this.options.clientId) {
+      this.options.clientId = clientId
+      this.envelopeCtx.clientId = clientId
+    }
+  }
+
   private setStatus(next: ConnectionStatus): void {
     if (this.status === next) return
     this.status = next
@@ -130,6 +146,7 @@ export class WsClient {
       name: this.options.name,
       ...(this.options.key ? { key: this.options.key } : {}),
       ...(this.options.rt ? { rt: this.options.rt } : {}),
+      ...(this.options.sessionToken ? { st: this.options.sessionToken } : {}),
     }
     const url = this.options.urlFactory ? this.options.urlFactory(params) : buildWsUrl(params)
     const factory = this.options.socketFactory ?? ((target: string) => new WebSocket(target))

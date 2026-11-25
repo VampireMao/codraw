@@ -141,9 +141,9 @@ func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter 
 
 // accessLog emits one structured line per request.
 //
-// Privacy: the query string is logged with key/rt/name/cid redacted. Edit and
-// viewer keys appear in share URLs by design and would otherwise land in every
-// log sink (docs/PROTOCOL.md §2.1 requires exactly this).
+// Privacy: the query string is logged with key/rt/st/name/cid redacted. Edit and
+// viewer keys and session tokens appear in URLs by design and would otherwise land
+// in every log sink (docs/PROTOCOL.md §2.1 requires exactly this).
 func (s *Server) accessLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := s.deps.Now()
@@ -185,6 +185,7 @@ var redactedParams = map[string]struct{}{
 	"name":      {}, // nickname is personal data (PRD §2)
 	"cid":       {}, // stable per-tab device identifier
 	"editorKey": {},
+	"st":        {}, // session token (?st=) binds the clientId; bearer credential
 	"token":     {}, // /ops and /metrics bearer token passed as a query parameter
 }
 

@@ -621,6 +621,10 @@ func run(o overrides) (int, error) {
 	wsSrv.SetRoleResolver(func(ctx context.Context, code, key, rt string) (string, error) {
 		return roleResolver{store: st, signer: signer}.Resolve(ctx, code, key, rt)
 	})
+	// Server-issued session identities: a clientId is only trusted when it comes
+	// from a signed token or is freshly generated here. Without this, anyone who
+	// sees the owner's clientId in presence could reconnect as the owner.
+	wsSrv.SetSessionSigner(signer, cfg.Rooms.TTL)
 	wsSrv.SetMetrics(reg)
 
 	srvAPI, err := api.New(api.Deps{

@@ -46,6 +46,7 @@ type stack struct {
 	reg     *metrics.Registry
 	cfg     *config.Config
 	signer  *auth.TokenSigner
+	wsSrv   *ws.Server
 	baseURL string
 }
 
@@ -265,7 +266,7 @@ func newStackFull(t *testing.T, mutate func(*config.Config), origins []string, l
 
 	return &stack{
 		t: t, htt: htt, hub: h, store: st, broker: br, reg: reg,
-		cfg: cfg, signer: signer, baseURL: htt.URL,
+		cfg: cfg, signer: signer, wsSrv: wsSrv, baseURL: htt.URL,
 	}
 }
 
@@ -320,8 +321,27 @@ type client struct {
 	mu     sync.Mutex
 }
 
+// enableSessions turns on server-issued client identities for this stack. Tests
+// that do not call it keep the legacy cid-based handshake, so the existing
+// suite stays focused on its own subject.
+func (s *stack) enableSessions() {
+	s.t.Helper()
+	s.wsSrv.SetSessionSigner(s.signer, time.Hour)
+}
+
 // dial opens a connection with the given query.
 func (s *stack) dial(roomCode, cid, name, key, rt string) *client {
+	s.t.Helper()
+	return s.dialQuery(roomCode, cid, name, key, rt, "")
+}
+
+// dialWithSession opens a connection presenting a session token.
+func (s *stack) dialWithSession(roomCode, cid, name, st string) *client {
+	s.t.Helper()
+	return s.dialQuery(roomCode, cid, name, "", "", st)
+}
+
+func (s *stack) dialQuery(roomCode, cid, name, key, rt, st string) *client {
 	s.t.Helper()
 	u := strings.Replace(s.baseURL, "http://", "ws://", 1) + "/ws"
 	q := fmt.Sprintf("?room=%s&cid=%s&name=%s", roomCode, cid, name)
@@ -329,6 +349,9 @@ func (s *stack) dial(roomCode, cid, name, key, rt string) *client {
 		q += "&rt=" + rt
 	} else if key != "" {
 		q += "&key=" + key
+	}
+	if st != "" {
+		q += "&st=" + st
 	}
 	dialer := websocket.Dialer{HandshakeTimeout: 5 * time.Second}
 	hdr := http.Header{"Origin": []string{s.baseURL}}

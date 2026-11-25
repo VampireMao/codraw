@@ -168,6 +168,8 @@ export interface JoinedPayload {
   readonly serverTime?: number
   /** 当前房主；`null` = 无主房间（PERMISSIONS §4.3 / §6.3） */
   readonly ownerClientId?: string | null
+  /** 服务端签发的会话 token；重连时作为 `?st=` 带回 */
+  readonly sessionToken?: string
 }
 
 /** §4.2 `resync.snapshot`：分块快照，收齐才替换视图。 */

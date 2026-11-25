@@ -235,15 +235,28 @@ secret  = READONLY_SECRET 环境变量（≥32 字节随机串）
 
 ### 2.1 端点与查询参数
 
-`GET /ws?room={code}&cid={clientId}&name={nickname}&key={editorKey|viewerKey}&rt={readonlyToken}`
+`GET /ws?room={code}&cid={clientId}&name={nickname}&key={editorKey|viewerKey}&rt={readonlyToken}&st={sessionToken}`
 
 | 参数 | 必填 | 说明 |
 |---|---|---|
 | `room` | 是 | 6 位房间码，大小写不敏感 |
-| `cid` | 是 | 客户端实例 ID，**同一标签页生命周期内不变，重连必须复用** |
+| `cid` | 否 | 客户端候选实例 ID；**开启会话身份后仅作提示，服务端不信任它**。首次连接会返回服务端分配的权威 `you.clientId` |
 | `name` | 否 | 昵称 1–24 字符；缺省 `访客-{cid 前 4 位}`；服务端截断并转义 |
 | `key` | 否 | `editorKey` / `viewerKey`；缺失即 viewer |
 | `rt` | 否 | 只读 token；**存在时强制 viewer，忽略 key 的提权** |
+| `st` | 否 | 服务端签发的会话 token（见 §2.1.1）；重连必须原样带回 |
+
+#### 2.1.1 会话身份（`st`）
+
+`clientId` 是**授权键**（房主、editor grant 都按它索引），因此不能由客户端自报：
+
+1. 首次连接（无 `st`）时，服务端**生成**一个随机 `clientId`，并在 `joined.sessionToken` 返回签名 token。
+2. 该 token 是 HMAC-SHA256 签名，claims 为 `{ code, cid, iat, exp }`；`typ` 为 `CDRS`，与只读 token（`CDRT`）不可互换。
+3. 重连时客户端携带 `?st=`；服务端校验签名、房间绑定与过期时间后，采用 token 中的 `cid`。
+4. 无效/过期/跨房间的 `st` **不会报错**，而是回退为一次全新会话（新 `clientId`，viewer），并在新的 `joined` 中下发新 token，避免客户端陷入重连死循环。
+5. 服务端永远不以 URL 里的 `cid` 作为 owner/editor 判定依据；没有有效 `st` 时它只是一个新访客。
+
+> 这是 v1.1 的安全修正：旧实现信任 URL 里的 `cid`，导致任何能看到房主 `clientId` 的人都能冒充房主。
 
 > **`lastSeq` 不放 URL**：它属于同步状态而非身份，由升级后的首帧 `hello` 携带。这样刷新重连不会因为 URL 缓存产生陈旧的 `lastSeq`，也便于日志打码时只处理密钥类参数。
 
@@ -531,7 +544,8 @@ WS 升级成功
   "payload": {
     "you": { "clientId": "c_abc123", "userId": "u_5c1e", "name": "小林", "color": "#3d5afe",
              "role": "owner", "isOwner": true },
-    "ownerClientId": "c_abc123"
+    "ownerClientId": "c_abc123",
+    "sessionToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkNEUlMifQ...."
   }
 }
 ```
@@ -541,6 +555,8 @@ WS 升级成功
 | `you.role` | string | `owner`｜`editor`｜`viewer`，由 §4.2 顺序判定 |
 | `you.isOwner` | bool | 等价于 `role === "owner"` 的便捷布尔 |
 | `ownerClientId` | string\|null | 当前房主；`null` 表示房间无主 |
+| `sessionToken` | string | 服务端签发的会话 token；客户端必须保存并在重连时以 `?st=` 带回（§2.1.1） |
+| `you.clientId` | string | **服务端权威 clientId**；客户端必须采用它，而不是自己 URL 里的候选值 |
 
 > `ownerClientId` 与 `you.role` 可能"看似矛盾"（如只读 token 进入、`cid` 恰是房主）：
 > 以 `you.role` 为准。只读 token 永远 `viewer`，见 `docs/PERMISSIONS.md` §4.2 规则 1。

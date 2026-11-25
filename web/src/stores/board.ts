@@ -16,7 +16,7 @@ import type { ToolId } from '@/canvas/tools/types'
 import { TOOL_KEYS } from '@/canvas/history'
 import type { ConnectionStatus, JoinedUser, PresenceUser, Role, RoomLimits } from '@/net/types'
 import { DEFAULT_LIMITS, canRoleEdit } from '@/net/types'
-import { ensureClientId } from './storage'
+import { ensureClientId, writeClientId } from './storage'
 
 export const useBoardStore = defineStore('board', () => {
   /** clientId：同一浏览器标签页生命周期内不变（协议 §2.1） */
@@ -250,6 +250,22 @@ export const useBoardStore = defineStore('board', () => {
 
   /* ------------------------------ 房间与连接 ------------------------------ */
 
+  /**
+   * 采用服务端下发的权威 clientId。
+   *
+   * 客户端本地生成的 cid 只是“候选值”：服务端可能拒绝它并分配一个新的
+   * （例如没有有效会话 token 时），此后所有 presence、授权、op 归属都以
+   * 服务端返回的为准。
+   */
+  function setCid(next: string): void {
+    const value = next.trim()
+    if (!value || value === cid.value) return
+    cid.value = value
+    writeClientId(value)
+    // 自己的颜色/角色由 joined/setMembers 重新对齐，避免留着旧身份的缓存。
+    if (me.value && me.value.clientId !== value) me.value = null
+  }
+
   function setRoomMeta(next: { code: string; title: string }): void {
     code.value = next.code.toUpperCase()
     title.value = next.title || '未命名白板'
@@ -350,6 +366,7 @@ export const useBoardStore = defineStore('board', () => {
 
   return {
     cid,
+    setCid,
     code,
     title,
     role,

@@ -16,6 +16,7 @@ import {
 } from '@/net/persistence'
 import type { ConnectionStatus, PresenceUser } from '@/net/types'
 import { pushToast } from '@/components/ui'
+import { readRoomClientId, readRoomSession, writeRoomClientId, writeRoomSession } from '@/stores/storage'
 import type { useBoardStore } from '@/stores/board'
 
 type BoardStore = ReturnType<typeof useBoardStore>
@@ -47,17 +48,26 @@ export interface RoomSession {
  */
 export async function createRoomSession(options: RoomSessionOptions): Promise<RoomSession> {
   const { store, roomCode } = options
-  const cid = store.cid
   const normalizedCode = roomCode.toUpperCase()
+  // The candidate identity for the first handshake. The server may replace it
+  // (no valid session token) and returns the authoritative one in `joined`.
+  // Prefer this room's remembered cid so IndexedDB pending state still matches
+  // when one tab visits several rooms in sequence.
+  const rememberedCID = readRoomClientId(normalizedCode)
+  if (rememberedCID) store.setCid(rememberedCID)
+  const initialCid = store.cid
+  const storedSession = readRoomSession(normalizedCode)
 
   // ---------- 1. 持久化 ----------
   const saver = createThrottledSaver(400)
   const persistence: Persistence = {
-    load: () => loadRoomState(normalizedCode, cid),
+    // Read the cid at call time: it may be replaced by the server's authoritative
+    // value before the first save, and pending ops must follow that identity.
+    load: () => loadRoomState(normalizedCode, store.cid),
     save: (state: { appliedSeq: number; epoch: number; pending: readonly PersistedOp[] }) => {
       saver.schedule(() => ({
         roomId: normalizedCode,
-        clientId: cid,
+        clientId: store.cid,
         appliedSeq: state.appliedSeq,
         epoch: state.epoch,
         pending: state.pending.map((op) => ({
@@ -121,7 +131,7 @@ export async function createRoomSession(options: RoomSessionOptions): Promise<Ro
 
   const realtime = new RealtimeClient({
     roomId: normalizedCode,
-    clientId: cid,
+    clientId: initialCid,
     displayName: options.displayName,
     ...(options.editorKey ? { key: options.editorKey } : {}),
     ...(options.readonlyToken ? { rt: options.readonlyToken } : {}),
@@ -152,6 +162,19 @@ export async function createRoomSession(options: RoomSessionOptions): Promise<Ro
         store.setAppliedSeq(realtime.appliedSeq)
       },
       onJoined(payload) {
+        // The server is authoritative about who this connection is. It may
+        // replace the candidate cid (no valid session token) and returns the
+        // token to present on the next reconnect.
+        const authoritativeCID = payload.you.clientId
+        if (authoritativeCID) {
+          store.setCid(authoritativeCID)
+          writeRoomClientId(normalizedCode, authoritativeCID)
+          realtime.setClientId(authoritativeCID)
+          if (payload.sessionToken) {
+            writeRoomSession(normalizedCode, payload.sessionToken)
+            ws?.setSession(payload.sessionToken, authoritativeCID)
+          }
+        }
         store.applyJoined({
           you: payload.you,
           room: payload.room,
@@ -193,10 +216,11 @@ export async function createRoomSession(options: RoomSessionOptions): Promise<Ro
   ws = new WsClient(
     {
       roomId: normalizedCode,
-      clientId: cid,
+      clientId: initialCid,
       name: options.displayName,
       ...(options.editorKey ? { key: options.editorKey } : {}),
       ...(options.readonlyToken ? { rt: options.readonlyToken } : {}),
+      ...(storedSession ? { sessionToken: storedSession } : {}),
     },
     {
       onOpen: () => realtime.onOpen(),

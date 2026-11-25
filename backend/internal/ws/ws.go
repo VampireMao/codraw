@@ -19,6 +19,8 @@ package ws
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +35,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/codraw/codraw/backend/internal/auth"
 	"github.com/codraw/codraw/backend/internal/hub"
 	"github.com/codraw/codraw/backend/internal/metrics"
 	"github.com/codraw/codraw/backend/internal/protocol"
@@ -50,6 +53,11 @@ type Server struct {
 	now func() time.Time
 	// resolveRoleFn is the injected credential resolver; nil means "viewer only".
 	resolveRoleFn RoleResolver
+	// sessionSigner mints/verifies the clientId credential. When set, the server
+	// never trusts the cid query parameter for an unverified connection: it
+	// generates a fresh clientId instead. See resolveClientIdentity.
+	sessionSigner *auth.TokenSigner
+	sessionTTL    time.Duration
 	upgrade       websocket.Upgrader
 	// metrics receives frame counters; nil disables counting.
 	metrics MetricsSink
@@ -63,6 +71,21 @@ type MetricsSink interface {
 
 // SetMetrics installs the metrics sink. Optional: nil is a valid no-op.
 func (s *Server) SetMetrics(m MetricsSink) { s.metrics = m }
+
+// SetSessionSigner enables server-issued session identities.
+//
+// This is the fix for clientId spoofing: once a signer is installed, a
+// connection without a valid session token gets a **server-generated** clientId,
+// so presenting the owner's (or an editor's) clientId in the query string no
+// longer inherits that member's role. The token is returned in `joined` and is
+// expected on the next reconnect (?st=...). It must be called before serving.
+func (s *Server) SetSessionSigner(signer *auth.TokenSigner, ttl time.Duration) {
+	s.sessionSigner = signer
+	if ttl <= 0 {
+		ttl = 30 * 24 * time.Hour
+	}
+	s.sessionTTL = ttl
+}
 
 // observe counts a frame when a sink is installed.
 func (s *Server) observe(dir, typ string) {
@@ -196,9 +219,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.writeHandshakeError(w, r, http.StatusBadRequest, protocol.CodeBadRequest, "room code must be 6 characters")
 		return
 	}
-	cid := strings.TrimSpace(q.Get("cid"))
-	if !validClientID(cid) {
-		s.writeHandshakeError(w, r, http.StatusBadRequest, protocol.CodeBadRequest, "cid is required and must be 8-40 id characters")
+	// The clientId is an *identity*, not an input we can trust. With a session
+	// signer installed, only a valid ?st= token can pin a cid; otherwise the
+	// server generates a fresh one. Without a signer (tests / legacy wiring) the
+	// query parameter is still accepted, and a warning is logged at startup.
+	cid, sessionToken, err := s.resolveClientIdentity(code, q.Get("cid"), q.Get("st"))
+	if err != nil {
+		s.writeHandshakeError(w, r, http.StatusBadRequest, protocol.CodeBadRequest, err.Error())
 		return
 	}
 	name := protocol.SanitizeNickname(q.Get("name"), s.cfg.Limits.MaxNameRunes)
@@ -263,7 +290,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// joined is queued before readPump starts so it is provably the first frame
 	// on the wire.
-	c.sendJoined(res)
+	c.sendJoined(res, sessionToken)
 
 	// Announce the newcomer to everyone else, including a full member list so
 	// clients never need to reconcile increments (PROTOCOL §4.6).
@@ -288,6 +315,54 @@ func (s *Server) resolveRole(ctx context.Context, code, key, rt string) (string,
 		return protocol.RoleViewer, nil
 	}
 	return s.resolveRoleFn(ctx, code, key, rt)
+}
+
+// errInvalidClientID is returned when the legacy (no session signer) path gets a
+// malformed cid.
+var errInvalidClientID = errors.New("cid is required and must be 8-40 id characters")
+
+// resolveClientIdentity decides the authoritative clientId for a handshake and,
+// when sessions are enabled, mints the token the client must present next time.
+//
+// Security rule: with a signer installed, the `cid` query parameter is never
+// authoritative. A valid ?st= token pins the cid; otherwise the server generates
+// a fresh one. This is what stops a viewer from presenting the owner's cid and
+// inheriting ownership (the room resolves roles by cid).
+func (s *Server) resolveClientIdentity(code, requestedCID, presented string) (cid, sessionToken string, err error) {
+	if s.sessionSigner == nil {
+		cid = strings.TrimSpace(requestedCID)
+		if !validClientID(cid) {
+			return "", "", errInvalidClientID
+		}
+		return cid, "", nil
+	}
+
+	if presented != "" {
+		if claims, verr := s.sessionSigner.VerifySession(presented, code, s.now()); verr == nil && validClientID(claims.ClientID) {
+			cid = claims.ClientID
+		}
+	}
+	if cid == "" {
+		cid, err = newClientID()
+		if err != nil {
+			return "", "", fmt.Errorf("generate client id: %w", err)
+		}
+	}
+	token, _, ierr := s.sessionSigner.IssueSession(code, cid, s.sessionTTL, s.now())
+	if ierr != nil {
+		return "", "", fmt.Errorf("issue session token: %w", ierr)
+	}
+	return cid, token, nil
+}
+
+// newClientID returns 10 random bytes hex-encoded (20 characters), matching the
+// `^[A-Za-z0-9_-]{8,40}$` clientId contract.
+func newClientID() (string, error) {
+	var b [10]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b[:]), nil
 }
 
 // originAllowed implements the allowlist rule from docs/PROTOCOL.md §2.1.
@@ -549,7 +624,7 @@ func (c *conn) setRole(role string) { c.SetRole(role) }
 // role onto the connection. Using res.Role here would hand the client a role the
 // room no longer holds, and since the grant's fan-out skips a not-yet-announced
 // member, nothing else would correct it.
-func (c *conn) sendJoined(res room.JoinResult) {
+func (c *conn) sendJoined(res room.JoinResult, sessionToken string) {
 	you := c.User()
 	stats := c.rh.Stats()
 	ownerCID := stats.OwnerClientID
@@ -572,6 +647,7 @@ func (c *conn) sendJoined(res room.JoinResult) {
 		Limits:        c.srv.cfg.LimitsPayload,
 		ServerTime:    c.srv.now().UnixMilli(),
 		OwnerClientID: owner,
+		SessionToken:  sessionToken,
 	}
 	frame, err := protocol.Marshal(protocol.TypeJoined, c.params.room, c.params.cid, 0, c.srv.now().UnixMilli(), payload)
 	if err != nil {

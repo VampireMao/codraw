@@ -450,6 +450,10 @@ type JoinedPayload struct {
 	// OwnerClientID is the current room owner, null when the room is unowned
 	// (docs/PERMISSIONS.md §4.3).
 	OwnerClientID *string `json:"ownerClientId"`
+	// SessionToken is a server-signed credential for this clientId. The client
+	// must present it as ?st= on reconnect; without it the server will assign a
+	// new identity and the client will not retain ownership/grants.
+	SessionToken string `json:"sessionToken,omitempty"`
 }
 
 // MemberRolePayload is the body of `member.role` (docs/PERMISSIONS.md §3.1).

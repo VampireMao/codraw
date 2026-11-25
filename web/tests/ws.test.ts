@@ -91,6 +91,7 @@ function makeClient(overrides: Partial<ConstructorParameters<typeof WsClient>[0]
         if (params.name) url.searchParams.set('name', params.name)
         if (params.key) url.searchParams.set('key', params.key)
         if (params.rt) url.searchParams.set('rt', params.rt)
+        if (params.st) url.searchParams.set('st', params.st)
         return url.toString()
       },
       socketFactory: (url) => new FakeSocket(url) as unknown as WebSocket,
@@ -137,6 +138,14 @@ describe('WsClient：连接与握手 URL', () => {
     const { client } = makeClient({ key: 'abc43chars' })
     client.connect()
     expect(FakeSocket.last.url).toContain('key=abc43chars')
+  })
+
+  it('session token 进握手 URL，且 setSession 会同时更新 cid', () => {
+    const { client } = makeClient()
+    client.setSession('sess-token', 'c_server_assigned')
+    client.connect()
+    expect(FakeSocket.last.url).toContain('st=sess-token')
+    expect(FakeSocket.last.url).toContain('cid=c_server_assigned')
   })
 
   it('lastSeq 不出现在 URL（协议 §2.1 要求走 hello）', () => {

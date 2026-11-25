@@ -227,6 +227,17 @@ export class RealtimeClient {
     this.persist()
   }
 
+  /**
+   * 采用服务端下发的权威 clientId。
+   *
+   * `applyRemoteBody` 用 clientId 判断“这是不是我自己的 op”，握手 hello 也
+   * 用它构造信封；服务端可能拒绝客户端候选 cid，所以 joined 之后必须同步。
+   */
+  setClientId(clientId: string): void {
+    if (!clientId) return
+    this.options.clientId = clientId
+  }
+
   /* -------------------------------- 状态 -------------------------------- */
 
   get currentStatus(): ConnectionStatus {

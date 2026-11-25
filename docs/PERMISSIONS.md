@@ -107,9 +107,13 @@ owner 离开
 
 ## 4. 连接与握手
 
-### 4.1 握手参数不变
+### 4.1 握手参数
 
-`GET /ws?room={code}&cid={clientId}&name={nickname}&key={editorKey|viewerKey}&rt={readonlyToken}`
+`GET /ws?room={code}&cid={clientId}&name={nickname}&key={editorKey|viewerKey}&rt={readonlyToken}&st={sessionToken}`
+
+- `cid` 是客户端候选值，服务端**不信任**它；首次连接会生成权威 `clientId` 并通过 `joined.you.clientId` 返回。
+- `st` 是服务端签发的会话 token（`docs/PROTOCOL.md` §2.1.1）。重连必须携带，否则视为新访客。
+- 会话 token 只绑定 `clientId`，不改变角色；owner/editor 仍按 §4.2 判定。
 
 ### 4.2 角色判定顺序（服务端，严格按此顺序）
 
@@ -123,6 +127,8 @@ owner 离开
 ```
 
 > 注意第 1 条优先于第 2 条：拿着只读 token 进来的人，即使 `cid` 和房主相同（例如房主自己点了自己的只读链接），也必须是 viewer。这是安全底线。
+>
+> **`cid` 必须是服务端签发或校验过的身份**：在开启会话 token 后，没有有效 `st` 的连接会拿到一个全新的 `clientId`，因此 URL 里的 `cid` 无法命中第 2/3 条。这是防止“看到房主 clientId 就冒充房主”的关键，详见 `docs/PROTOCOL.md` §2.1.1。
 
 ### 4.3 `joined.payload.you` 新增字段
 

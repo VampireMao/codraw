@@ -209,6 +209,8 @@ export interface HandshakeParams {
   key?: string
   /** 只读 token（`?rt=`，强制降权 viewer） */
   rt?: string
+  /** 服务端签发的会话 token（`?st=`，把 clientId 绑定到签名） */
+  st?: string
 }
 
 /**
@@ -223,5 +225,6 @@ export function buildWsUrl(params: HandshakeParams, origin = window.location): s
   if (params.name) url.searchParams.set('name', params.name)
   if (params.key) url.searchParams.set('key', params.key)
   if (params.rt) url.searchParams.set('rt', params.rt)
+  if (params.st) url.searchParams.set('st', params.st)
   return url.toString()
 }

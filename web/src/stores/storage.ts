@@ -58,6 +58,30 @@ export function ensureClientId(): string {
   return cid
 }
 
+/**
+ * 记住服务端下发的权威 clientId。
+ *
+ * 必须写回 sessionStorage：IndexedDB 的 pending 队列按 `${room}:${cid}` 分键，
+ * 刷新后要在 joined 之前就知道该去哪个键加载，否则上一段离线的笔迹会读不到。
+ */
+export function writeClientId(cid: string): void {
+  const value = cid.trim()
+  if (!/^[\w-]{8,40}$/.test(value)) return
+  writeSession('cid', value)
+}
+
+/** 每个房间记住自己的权威 clientId（同一标签页切换房间时不串身份）。 */
+export function readRoomClientId(code: string): string | null {
+  const value = readSession(`cid.${code.toUpperCase()}`)
+  return value && /^[\w-]{8,40}$/.test(value) ? value : null
+}
+
+export function writeRoomClientId(code: string, cid: string): void {
+  const value = cid.trim()
+  if (!/^[\w-]{8,40}$/.test(value)) return
+  writeSession(`cid.${code.toUpperCase()}`, value)
+}
+
 function readSession(key: string): string | null {
   try {
     return window.sessionStorage.getItem(PREFIX + key)
@@ -71,6 +95,30 @@ function writeSession(key: string, value: string): void {
     window.sessionStorage.setItem(PREFIX + key, value)
   } catch {
     /* 隐私模式：每次刷新换新 id，可接受 */
+  }
+}
+
+/**
+ * 每个房间一个服务端签发的会话 token（`joined.sessionToken`）。
+ *
+ * 它把 clientId 绑定到服务端签名上：没有 token 的连接会拿到一个全新的
+ * clientId，所以仅凭 URL 里的 cid 无法冒充房主/已授权编辑。放 sessionStorage
+ * 是为了按标签页隔离、刷新后仍能保持同一身份。
+ */
+export function readRoomSession(code: string): string | null {
+  return readSession(`st.${code.toUpperCase()}`)
+}
+
+export function writeRoomSession(code: string, token: string): void {
+  if (!token) return
+  writeSession(`st.${code.toUpperCase()}`, token)
+}
+
+export function clearRoomSession(code: string): void {
+  try {
+    window.sessionStorage.removeItem(PREFIX + `st.${code.toUpperCase()}`)
+  } catch {
+    /* noop */
   }
 }
 
